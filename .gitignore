@@ -1,0 +1,51 @@
+# --- Python Standard ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+*.swp
+
+# --- Model Checkpoints ---
+# Exclude all saved model folders and .pth files
+**/saved_models/
+*.pth
+*.ckpt
+
+# --- Data & Datasets ---
+# Exclude data folders in specific cases
+case_01_human_walk/data/
+case_02_protein/mdanalysis/
+case_03_nbody/data_*/
+
+# Exclude large data files if they exist outside those folders
+*.pkl
+*.npy
+*.pt
+*.h5
+*.pdb
+*.dcd
+
+# --- Results & Visualizations ---
+# Exclude results folders where plots and gifs are saved
+**/results/
+*.png
+*.jpg
+*.gif
+*.mp4
+
+# --- Logs ---
+*.log
+training.log
+events.out.tfevents.*
+
+# --- System ---
+.DS_Store
+Thumbs.db
