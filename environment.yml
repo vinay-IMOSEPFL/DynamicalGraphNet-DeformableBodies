@@ -1,0 +1,16 @@
+# Conda environment for the Dynami-CAL GraphNet deformable-body experiments.
+#
+#   conda env create -f environment.yml
+#   conda activate dyngnet
+#
+# Everything except Python itself is installed through pip. Mixing conda-forge
+# numpy with the pip PyTorch wheel places two OpenMP runtimes in one process,
+# which aborts the interpreter on import in an order-dependent way.
+name: dyngnet
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -r requirements.txt

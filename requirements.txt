@@ -1,0 +1,18 @@
+# Pinned environment for the Dynami-CAL GraphNet deformable-body experiments.
+# Verified on Python 3.12 with an NVIDIA RTX 2080 Ti (CUDA 12.6 wheels).
+#
+# The default linux-x86_64 torch wheel is already the CUDA build, so no extra
+# index URL is needed. Use --index-url only to pin a different CUDA version or
+# to force a CPU-only build.
+
+torch==2.7.0
+torch-geometric==2.6.1
+numpy==2.5.2
+scipy==1.18.0
+matplotlib==3.9.2
+tqdm==4.66.5
+imageio==2.33.1
+joblib==1.5.3
+MDAnalysis==2.10.0
+MDAnalysisData==0.9.1
+scikit-learn==1.9.0

@@ -1,4 +1,4 @@
-# --- Python Standard ---
+# --- Python ---
 __pycache__/
 *.pyc
 *.pyo
@@ -8,42 +8,55 @@ env/
 venv/
 .env
 
-# --- IDE Settings ---
+# --- IDE ---
 .vscode/
 .idea/
 *.swp
 
-# --- Model Checkpoints ---
-# Exclude all saved model folders and .pth files
-**/saved_models/
+# --- Checkpoints ---
+# Excluded by default. The two checkpoints that reproduce the reported numbers are
+# re-included below; they are small enough to ship.
+**/saved_models/*
 *.pth
 *.ckpt
+!case_01_human_walk/saved_models/Val_Loss_0.40821mm_iter598.pth
+!case_03_nbody/saved_models/Val_Loss_0.01504mm_iter550.pth
 
-# --- Data & Datasets ---
-# Exclude data folders in specific cases
-case_01_human_walk/data/
+# --- Data ---
+# Raw trajectories are downloaded or generated, never committed. The exception is the
+# human walk split files: they fix which frames are drawn, so the reported errors are
+# only reproducible if they ship.
+case_01_human_walk/data/*
 case_02_protein/mdanalysis/
 case_03_nbody/data_*/
-
-# Exclude large data files if they exist outside those folders
 *.pkl
 *.npy
 *.pt
 *.h5
 *.pdb
 *.dcd
+# Re-included after the blanket rules above, which would otherwise win on suffix.
+!case_01_human_walk/data/split_n1.pkl
+!case_01_human_walk/data/split_n2.pkl
+!case_01_human_walk/data/split_n3.pkl
 
-# --- Results & Visualizations ---
-# Exclude results folders where plots and gifs are saved
+# --- Results ---
+# Run outputs are excluded; the figures the README embeds live in docs/assets.
 **/results/
 *.png
 *.jpg
 *.gif
 *.mp4
+!docs/assets/*.png
+!docs/assets/*.gif
+
+# --- Scratch ---
+# Training/eval working directories, not part of the release.
+_runs/
 
 # --- Logs ---
 *.log
-training.log
+*.err
 events.out.tfevents.*
 
 # --- System ---

@@ -23,4 +23,6 @@ MODEL_SETTINGS ={
 }
 
 SEED = 90
-DEVICE_ID = "1" # From notebook: os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# Which GPU to run on. Override from the shell with CUDA_VISIBLE_DEVICES=<n>;
+# the default picks the first visible device.
+DEVICE_ID = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
