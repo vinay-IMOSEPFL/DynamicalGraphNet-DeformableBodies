@@ -11,11 +11,13 @@ class NBodyMStickDataset():
 
     """
     def __init__(self, partition='train', max_samples=1e8, data_dir='',
-                 n_isolated=5, n_stick=0, n_hinge=0, finite_diff=False, delta_frame=10, nsteps=1):
+                 n_isolated=5, n_stick=0, n_hinge=0, finite_diff=False, delta_frame=10, nsteps=1,
+                 random_start_frame=False):
         self.partition = partition
         self.data_dir = data_dir
         self.n_isolated,  self.n_stick, self.n_hinge = n_isolated, n_stick, n_hinge
         self.finite_diff = finite_diff
+        self.random_start_frame = random_start_frame
         if self.partition == 'val':
             self.suffix = 'valid'
         else:
@@ -69,6 +71,42 @@ class NBodyMStickDataset():
         self.max_samples = int(max_samples)
         self.data, self.edges, self.cfg = self.load()
 
+    # Frame 30 is the start the published results were produced from. Evaluation stays
+    # pinned to it so numbers remain comparable; only training moves off it.
+    EVAL_START_FRAME = 30
+
+    def frame_bounds(self, n_frames):
+        """
+        Earliest and latest start frame a sample can use.
+
+        Central differences need one frame either side of t and of the final step, which
+        is what the +1 and -2 account for.
+        """
+        lo = self.delta_frame + 1
+        hi = n_frames - 2 - self.nsteps * self.delta_frame
+        return lo, hi
+
+    def pick_start_frame(self, n_frames):
+        """
+        One trajectory gives one sample, which is what |Train| counts in the GMN paper:
+        500 trajectories are 500 training samples, and that number is the quantity its
+        data-efficiency comparison varies. Every split therefore starts at the same frame.
+
+        Setting random_start_frame draws a different start per fetch instead, which turns
+        the same 500 trajectories into roughly 28 times as many distinct samples. That is
+        a larger training set than the paper reports, so results stop being comparable
+        with it. Off by default for that reason.
+        """
+        lo, hi = self.frame_bounds(n_frames)
+        if hi < lo:
+            raise ValueError(
+                f"{self.partition}: trajectories are {n_frames} frames, too short for "
+                f"nsteps={self.nsteps} at delta_frame={self.delta_frame}"
+            )
+        if self.random_start_frame and self.partition == 'train':
+            return int(np.random.randint(lo, hi + 1))
+        return min(max(self.EVAL_START_FRAME, lo), hi)
+
     def get_n_nodes(self):
         return self.data[0].size(1)
 
@@ -76,7 +114,7 @@ class NBodyMStickDataset():
         loc, vel, edge_attr, charges = self.data
         loc, vel, edge_attr, charges = loc[i], vel[i], edge_attr[i], charges[i]
         
-        frame_t = 30
+        frame_t = self.pick_start_frame(loc.size(0))
         frame_t_p1 = frame_t + 1
         frame_t_m1 = frame_t - 1
 
@@ -119,10 +157,10 @@ class NBodyMStickDataset():
         state_prev = loc[frame_tm1], vel_tm1
         state_0 = loc[frame_t], vel_t
 
+        # Separate loop variable: `i` above is the sample index and is still needed.
         list_pos = []
-        for i in range(self.nsteps+1):
-            loc_next = loc[frame_t+i*10]
-            list_pos.append(loc_next)
+        for step in range(self.nsteps + 1):
+            list_pos.append(loc[frame_t + step * self.delta_frame])
 
         return state_prev,state_0, edge_attr, edges, charges, loc[frame_end], vel_end, cfg,list_pos
 

@@ -25,6 +25,8 @@ MODEL_SETTINGS = {
     "data_dir": DATA_DIR,
     "finite_diff": True,
     # Time steps
+    # Frames between one model step and the next. Reported errors are per step of this
+    # size, and the dataset derives every frame index from it.
     "delta_frame": 10,  # matching GMN dataset.py : https://github.com/hanjq17/GMN/blob/main/spatial_graph/n_body_system/dataset_nbody.py
     "time_step": 1,  # Used for finite diff calculation
     # N-Body specific configuration

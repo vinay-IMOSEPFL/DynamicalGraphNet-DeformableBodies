@@ -190,8 +190,23 @@ python main_protein.py --mode test
 python main_protein.py --mode visual
 ```
 
-Training writes the best checkpoint to the case's `saved_models/` and clears earlier ones.
 Visualisations land in the case's `results/`.
+
+> `--mode train` empties the case's `saved_models/` before it starts, so running it on a
+> fresh clone deletes the checkpoint that ships with the repository. Copy it elsewhere first
+> if you want to keep it, or restore it afterwards with `git checkout`.
+
+Two settings are worth knowing before changing them. `delta_frame` is the stride in frames
+between one model step and the next, 10 for n-body, 30 for human walk and 15 for protein; the
+reported errors are per step of that size, so changing it changes what a "step" means.
+
+For n-body, every sample starts at frame 30 of its trajectory, so one trajectory gives one
+sample and `max_training_samples` counts both. This follows GMN, whose loader fixes
+`frame_0, frame_T = 30, 40`, and matters because the paper varies the training set between
+500 and 1500 samples to measure data efficiency. The loader can draw a different start frame
+per sample instead, via `random_start_frame`, which turns the same 500 trajectories into
+about 28 times as many; it is off by default because results then stop being comparable with
+the published ones.
 
 ---
 
