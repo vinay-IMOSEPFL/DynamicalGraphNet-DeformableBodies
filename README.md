@@ -26,11 +26,12 @@ so the last quoted digit moves between runs.
 
 | Rollout | 1 step | 2 steps | 3 steps | 4 steps |
 |---|---|---|---|---|
-| MSE | 1.4796e-02 | 7.9042e-02 | 2.2723e-01 | 4.8982e-01 |
+| MSE | 1.6175e-02 | 8.3660e-02 | 2.3197e-01 | 4.8119e-01 |
 
 ![N-body rollout](docs/assets/nbody_rollout.png)
 
-Red is ground truth, blue is prediction. Red lines are rigid sticks, orange are hinges.
+Red is ground truth, blue is prediction. Red lines are rigid sticks, orange are hinges. This
+is a typical case, picked at the median of 60 test sequences rather than the best.
 
 The model is told which edges are sticks or hinges through an edge feature, but rigidity is
 never enforced on the output — there is no constraint projection or correction step. It is
@@ -39,8 +40,8 @@ over a test batch as the relative change in rigid-link length from the initial s
 
 | Rollout | median | p90 | p99 |
 |---|---|---|---|
-| 1 step  | 2.3% | 10.5% | 23.4% |
-| 4 steps | 6.3% | 22.7% | 77.6% |
+| 1 step  | 1.7% | 7.4% | 16.4% |
+| 4 steps | 4.7% | 18.7% | 58.6% |
 
 Typical links hold their length to within a few percent, which is why the overlay looks tight,
 but the tail is long — a small number of links distort badly. Anything needing hard rigidity
@@ -108,10 +109,10 @@ seed on a single worker and scored the shipped checkpoint on it:
 
 | Rollout | shipped `data_321` | independently generated |
 |---|---|---|
-| 1 step | 1.4796e-02 | 1.4369e-02 |
-| 2 steps | 7.9042e-02 | 7.5700e-02 |
-| 3 steps | 2.2723e-01 | 2.2234e-01 |
-| 4 steps | 4.8982e-01 | 4.8639e-01 |
+| 1 step | 1.6175e-02 | 1.5820e-02 |
+| 2 steps | 8.3660e-02 | 8.0821e-02 |
+| 3 steps | 2.3197e-01 | 2.2813e-01 |
+| 4 steps | 4.8119e-01 | 4.7030e-01 |
 
 Within 1–4%, and slightly lower on the new data. The arrays do not reproduce; the numbers do.
 
@@ -285,6 +286,25 @@ $$\Delta \vec{v}^{\text{ext}}_i = \psi_{n4}(\mathbf{h}_i)\,\vec{v}_i$$
 A scalar multiplying a vector that already rotates with the system keeps the whole model
 equivariant, and the form restricts this term to acting along the direction of travel — drag,
 not an arbitrary steering force.
+
+It is switched per case by `use_ext_force`, and only built when true:
+
+| Case | `use_ext_force` | Why |
+|---|---|---|
+| Human walk | `True` | gravity and ground contact act on the walker |
+| Protein | `True` | the backbone exchanges momentum with solvent that is not modelled |
+| N-body | `False` | closed system: `compute_F` is pairwise Coulomb only, nothing external |
+
+The n-body setting is worth spelling out, because it costs something. Trained with the head
+on, that case scored 1.4796e-02 at one step against 1.6175e-02 with it off — better by 9%.
+But the head has nothing to represent there: the simulator applies no external force, and
+ground-truth momentum is conserved to 0.03%. The gain was extra capacity fitting the one-step
+target, and it does not survive the rollout — by four steps the model without the head is
+ahead (4.8119e-01 against 4.8982e-01), its rigid links drift less, and its momentum violation
+is 7.4× smaller. We ship the model that matches the physics.
+
+Checkpoints are tied to the setting: one saved with the head on will not load with it off,
+because the external decoder's tensors have nowhere to go.
 
 ---
 

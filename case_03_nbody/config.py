@@ -18,6 +18,9 @@ MODEL_SETTINGS = {
     "nf": 64,  # Latent size
     "model": "dgn",
     "n_layers": 2,
+    # Learn an external influence on each node. The n-body system is closed, so this
+    # is off: nothing acts on it from outside and its total momentum is conserved.
+    "use_ext_force": False,
     "max_training_samples": 500,  # can use higher 1000, 1500.... etc.
     "data_dir": DATA_DIR,
     "finite_diff": True,

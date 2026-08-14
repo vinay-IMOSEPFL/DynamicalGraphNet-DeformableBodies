@@ -20,6 +20,9 @@ MODEL_SETTINGS ={
         "time_step":1.0,
         "delta_frame": 15, # int
         "results_dir": RESULTS_DIR,
+        # Learn an external influence on each node. The backbone exchanges momentum
+        # with solvent that is not modelled, so the system is open.
+        "use_ext_force": True,
 }
 
 SEED = 90

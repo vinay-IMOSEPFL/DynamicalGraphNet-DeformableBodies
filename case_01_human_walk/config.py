@@ -17,6 +17,8 @@ MODEL_SETTINGS = {
     "nf": 128,
     "model": "dgn",
     "n_layers": 2,
+    # Learn an external influence on each node. Off for a closed system.
+    "use_ext_force": True,
     "max_testing_samples": 600,
     "max_training_samples": 200,
     "data_dir": DATA_DIR,

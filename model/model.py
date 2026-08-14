@@ -443,6 +443,7 @@ class DynamicsSolver(torch.nn.Module):
         num_msgs=1,
         latent_size=128,
         mlp_layers=2,
+        use_ext_force=True,
     ):
 
         super(DynamicsSolver, self).__init__()
@@ -461,9 +462,11 @@ class DynamicsSolver(torch.nn.Module):
         )
 
         # --- External Force Model ---
-        ext_interaction_layers = []
-        for _ in range(num_msgs):
-            ext_interaction_layers.append(
+        # Only built when the system is actually open. A closed system such as the
+        # n-body case has no external field, and this is the one path that could
+        # change its total momentum, so leaving it out keeps conservation exact.
+        if use_ext_force:
+            self.ext_interaction_layers = nn.ModuleList(
                 build_mlp_d(
                     latent_size + 1,
                     latent_size,
@@ -471,8 +474,8 @@ class DynamicsSolver(torch.nn.Module):
                     num_layers=mlp_layers,
                     lay_norm=False,
                 )
+                for _ in range(num_msgs)
             )
-        self.ext_interaction_layers = nn.ModuleList(ext_interaction_layers)
 
         # --- Dynamics Parameters ---
         self.num_messages = num_msgs
@@ -569,9 +572,13 @@ class DynamicsSolver(torch.nn.Module):
             # The only term that can change the system's total momentum. A scalar times
             # the node's own velocity keeps it equivariant and confines it to the
             # direction of travel.
-            ext_input = torch.hstack((node_latent, node_v_t.norm(dim=1, keepdim=True)))
-
-            node_dv_ext = self.ext_interaction_layers[i](ext_input) * node_v_t
+            if hasattr(self, "ext_interaction_layers"):
+                ext_input = torch.hstack(
+                    (node_latent, node_v_t.norm(dim=1, keepdim=True))
+                )
+                node_dv_ext = self.ext_interaction_layers[i](ext_input) * node_v_t
+            else:
+                node_dv_ext = torch.zeros_like(node_v_t)
 
             # The decoded quantities are already impulses, so they add straight to the
             # velocity without a further dt.

@@ -21,7 +21,7 @@ venv/
 *.ckpt
 !case_01_human_walk/saved_models/Val_Loss_0.40821mm_iter598.pth
 !case_02_protein/saved_models/Val_Loss_2.35763mm_iter51.pth
-!case_03_nbody/saved_models/Val_Loss_0.01504mm_iter550.pth
+!case_03_nbody/saved_models/Val_Loss_0.01626mm_iter590.pth
 
 # --- Data ---
 # Raw trajectories are downloaded or generated, never committed. The exception is the

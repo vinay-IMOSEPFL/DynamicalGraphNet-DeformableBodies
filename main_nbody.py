@@ -109,7 +109,8 @@ def main():
                            train_stats, 
                            num_msgs=4, 
                            latent_size=MODEL_SETTINGS["nf"], 
-                           mlp_layers=MODEL_SETTINGS["n_layers"]).to(device)
+                           mlp_layers=MODEL_SETTINGS["n_layers"],
+                           use_ext_force=MODEL_SETTINGS["use_ext_force"]).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=MODEL_SETTINGS["lr"])
     trainer = Trainer(model, optimizer, device, train_stats, step_interval, SAVED_MODELS_DIR)
