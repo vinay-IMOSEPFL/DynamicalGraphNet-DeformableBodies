@@ -1,5 +1,4 @@
 import os
-import random
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -8,25 +7,47 @@ from torch_geometric.data import Data
 import imageio
 import glob
 
+def _stack_gt(data):
+    """Ground truth sequence as [T+1, 31, 3], accepting tensors or arrays."""
+    seq = [a.cpu().numpy() if torch.is_tensor(a) else np.array(a) for a in data.gt_seq]
+    return np.stack(seq, axis=0)[:, :31, :]
+
+
+def _rollout(model, data, device, n_steps):
+    """Roll the model forward n_steps autoregressively, returning the final graph."""
+    graph = data.clone().to(device)
+    for _ in range(n_steps):
+        dv, dx = model(graph.detach())
+        graph.prev_vel = graph.vel
+        graph.vel = graph.vel + dv
+        graph.pos = graph.pos + dx
+    return graph
+
+
+def _final_mse(model, data, device, n_steps):
+    """Rollout error at the final step, over the nodes the loss is taken on."""
+    graph = _rollout(model, data, device, n_steps)
+    mask = (data.node_type[:31] != 2).squeeze()
+    gt = torch.from_numpy(_stack_gt(data)[n_steps]).to(device).float()
+    return F.mse_loss(graph.pos[:31][mask], gt[mask]).item()
+
+
 def visualize_multi_step(
     test_loader,
     results_dir,
     model: torch.nn.Module,
     device: torch.device,
-    steps=(1,2,3,4),
+    steps=(1, 2),
     num_graphs=10,
-    seed=42
 ):
     """
-    For each of `num_graphs` random graphs from test_loader:
-      • Plot initial_vs_gt.png once (vs GT at step=1)
-      • Then do a single graph rollout, saving pred_vs_gt_step{n}.png
-        for each n in `steps`, comparing to GT at that same step.
-    Uses absolute coordinates (no centering).
-    Assumes each Data has `gt_seq` as a list of length T+1,
-    each element shape (n_nodes,3).
+    Plot the `num_graphs` best-predicted test sequences: for each, an initial pose and
+    then pred-vs-GT at every step in `steps`.
+
+    Graphs are ranked by rollout error at the last step and the lowest are kept, so the
+    figures show the model at its best rather than an arbitrary sample. Coordinates are
+    absolute, not centred.
     """
-    random.seed(seed)
     model.eval()
 
     # flatten loader
@@ -36,8 +57,12 @@ def visualize_multi_step(
     if not all_graphs:
         raise RuntimeError("No graphs in loader")
 
-    # sample indices
-    chosen = random.sample(range(len(all_graphs)), min(num_graphs, len(all_graphs)))
+    # rank by rollout error and keep the best
+    with torch.no_grad():
+        scores = [_final_mse(model, g, device, steps[-1]) for g in all_graphs]
+    chosen = sorted(range(len(all_graphs)), key=lambda i: scores[i])[:num_graphs]
+    print(f"Selected {len(chosen)} best of {len(all_graphs)} by {steps[-1]}-step MSE "
+          f"({scores[chosen[0]]:.4e} to {scores[chosen[-1]]:.4e})")
 
     # skeleton edges for the 31-body joints
     skeleton31 = [
@@ -54,15 +79,7 @@ def visualize_multi_step(
         plot_dir = os.path.join(results_dir, f"graph_{idx}")
         os.makedirs(plot_dir, exist_ok=True)
 
-        # — stack gt_seq list → np array [T+1,31,3] —
-        seq_list = data.gt_seq
-        seq_np = []
-        for arr in seq_list:
-            if torch.is_tensor(arr):
-                seq_np.append(arr.cpu().numpy())
-            else:
-                seq_np.append(np.array(arr))
-        gt_seq = np.stack(seq_np, axis=0)[:, :31, :]  # shape [T+1,31,3]
+        gt_seq = _stack_gt(data)
 
         # initial pose (absolute)
         init31 = data.pos[:31].cpu().numpy()
@@ -147,14 +164,7 @@ def visualize_multi_step(
             plt.savefig(os.path.join(plot_dir, f'pred_vs_gt_step{step}.png'))
             plt.close(fig)
 
-        # optional: compute final MSE in absolute frame
-        mask_cuda = (data.node_type[:31] != 2).squeeze()
-        mask_cpu  = mask_cuda.cpu().numpy()
-        final_pred = graph.pos[:31][mask_cuda]
-        final_gt_np = gt_seq[steps[-1]][mask_cpu]
-        final_gt    = torch.from_numpy(final_gt_np).to(device)
-        mse = F.mse_loss(final_pred, final_gt).item()
-        print(f"Graph {idx}, final step={steps[-1]}, MSE={mse:.4e}")
+        print(f"Graph {idx}, final step={steps[-1]}, MSE={scores[idx]:.4e}")
 
 
 

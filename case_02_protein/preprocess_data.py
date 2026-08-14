@@ -1,3 +1,14 @@
+"""
+Build the AdK training data: download the equilibrium trajectory, take the backbone
+atoms, and write one file per frame plus a shared topology file.
+
+Run once from inside this folder, since the output path is relative:
+
+    cd case_02_protein && python preprocess_data.py
+
+Existing files are overwritten but not cleared first, so delete the output directory
+if a previous run produced a different number of frames.
+"""
 
 from tqdm import tqdm
 import os
@@ -13,10 +24,7 @@ from MDAnalysisData import datasets
 
 from sklearn.preprocessing import OneHotEncoder
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3) Main preprocessing
-# ─────────────────────────────────────────────────────────────────────────────
-# Settings (replace argparse)
+# Settings are inline rather than argparse: this script is run once, as-is.
 tmp_dir     = 'mdanalysis/dataset/'
 top_file    = None      
 traj_file   = None     
@@ -24,9 +32,7 @@ backbone    = True
 is_save     = True
 use_sg      = False   # use savitzky golay filtering for stencil based finite diferencing : (redundant we use simple finite-diff)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.1) Load or fetch ADK
-# ─────────────────────────────────────────────────────────────────────────────
+# Load the trajectory, fetching it on first run.
 if top_file is not None and traj_file is not None:
     top_path  = os.path.join(tmp_dir, top_file)
     traj_path = os.path.join(tmp_dir, traj_file)
@@ -41,9 +47,7 @@ if backbone:
 else:
     ag = data.atoms
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.2) Local (bond) graph & charges/type/masses
-# ─────────────────────────────────────────────────────────────────────────────
+# Bond graph, plus per-atom charge and one-hot type.
 
 charges = torch.tensor(data.atoms[ag.ix].charges, dtype=torch.float32).view(-1,1)
 
@@ -79,18 +83,14 @@ edges     = [torch.cat([src, dst], dim=0),
              torch.cat([dst, src], dim=0)]
 edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.3) Build raw_pos_list (all frames)
-# ─────────────────────────────────────────────────────────────────────────────
+# Positions for every frame.
 num_frames = len(data.trajectory)
 
 raw_pos_list = []
 for i in range(num_frames):
     raw_pos_list.append(data.trajectory[i].positions[ag.ix].copy())
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.4)plain Central Diff. on raw pos.
-# ─────────────────────────────────────────────────────────────────────────────
+# Central differences give velocities, so the first and last frames are dropped.
 # We want velocities for frames 1..(num_frames-2), so allocate exactly (num_frames-2) slots.
 loc = [None] * (num_frames - 2)
 vel = [None] * (num_frames - 2)
@@ -107,9 +107,7 @@ for i in range(1, num_frames - 1):
     loc[i - 1] = torch.tensor(pos_i, dtype=torch.float)
     vel[i - 1] = torch.tensor((pos_ip1 - pos_im1) * 0.5, dtype=torch.float)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.5) Save local graph data (we train on local data only)
-# ─────────────────────────────────────────────────────────────────────────────
+# Topology, shared by every frame.
 if backbone:
     save_path = os.path.join(tmp_dir, 'adk_backbone_processed', 'adk.pkl')
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -121,9 +119,7 @@ if is_save:
     torch.save((edges, edge_attr, node_feat, len(loc)), save_path)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3.7) Save per-frame data (loc, vel) for each core frame
-# ─────────────────────────────────────────────────────────────────────────────
+# One file per frame; the loader reads these individually.
 num_core_frames = len(loc)
 if backbone:
     out_dir = os.path.join(tmp_dir, 'adk_backbone_processed')

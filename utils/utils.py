@@ -6,11 +6,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 def set_seed(seed=42):
-    """Sets the seed for reproducibility."""
+    """
+    Seed the RNGs.
+
+    This pins initialisation and shuffling but not the scatter operations in the model:
+    index_add_ on CUDA accumulates in nondeterministic order, so runs still differ in the
+    last few digits. Making that deterministic as well costs noticeable speed.
+    """
     os.environ["PYTHONHASHSEED"] = str(seed)
-    # Deterministic behavior often slows down training significantly; 
-    # enable only if exact reproducibility is strictly required.
-    # os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8" 
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -92,11 +95,9 @@ def evaluate_rollout(test_loader, model, device, nsteps=1):
                 graph_curr.prev_vel = graph_curr.vel # Usually model returns cleaned prev_vel or similar
                 graph_curr.vel = new_vel
                 graph_curr.pos = new_pos
-                # prev_pos update is implicit in logic usually, but strict physics requires:
-                # graph_curr.prev_pos = graph_curr.pos.clone() (before update)
 
-            # Calculate loss against the ground truth of the *final* step
-            # Note: Ensure the dataset provides the correct end_pos for the n-th step
+            # Scored only at the final step, so intermediate drift is not penalised
+            # directly; the dataset supplies end_pos for that horizon.
             loss = F.mse_loss(new_pos, end_pos_gt)
             
             batch_num = graph_curr.num_graphs

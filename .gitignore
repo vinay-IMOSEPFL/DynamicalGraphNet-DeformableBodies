@@ -14,12 +14,13 @@ venv/
 *.swp
 
 # --- Checkpoints ---
-# Excluded by default. The two checkpoints that reproduce the reported numbers are
+# Excluded by default. The three checkpoints that reproduce the reported numbers are
 # re-included below; they are small enough to ship.
 **/saved_models/*
 *.pth
 *.ckpt
 !case_01_human_walk/saved_models/Val_Loss_0.40821mm_iter598.pth
+!case_02_protein/saved_models/Val_Loss_2.35763mm_iter51.pth
 !case_03_nbody/saved_models/Val_Loss_0.01504mm_iter550.pth
 
 # --- Data ---

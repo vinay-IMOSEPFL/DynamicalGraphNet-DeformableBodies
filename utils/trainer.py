@@ -5,6 +5,14 @@ import torch.nn.functional as F
 from utils.utils import evaluate
 
 class Trainer:
+    """
+    Training loop and checkpointing.
+
+    The loss is taken on dv and dx standardised by the training statistics, so the two
+    targets contribute comparably despite their different units. Only the best validation
+    checkpoint is kept.
+    """
+
     def __init__(self, model, optimizer, device, train_stats, step_interval, save_model_dir):
         self.model = model
         self.optimizer = optimizer
@@ -52,7 +60,8 @@ class Trainer:
         actual_node_dvel = train_graph.y_dv.float()
         actual_node_disp = train_graph.y_dx.float()
 
-        # Detaching stats again here is a safety measure to ensure the graph stays leaf-like
+        # Both sides are standardised the same way, so dv and dx contribute on a
+        # comparable scale despite their different units.
         pred_node_dvel_ = (pred_node_dvel - self.mean_node_dv) / self.std_node_dv
         pred_node_disp_ = (pred_node_disp - self.mean_node_disp) / self.std_node_disp
         actual_node_dvel_ = (actual_node_dvel - self.mean_node_dv) / self.std_node_dv

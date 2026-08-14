@@ -19,6 +19,8 @@ trajectory rather than against a held-out recording.
 
 Rollout error is mean squared error against ground truth, autoregressive from a single
 initial state. Reproduced with the shipped checkpoints on the commands in [Usage](#usage).
+Scattering impulses onto nodes uses `index_add_`, whose CUDA ordering is not deterministic,
+so the last quoted digit moves between runs.
 
 **N-body — 3 isolated particles, 2 sticks, 1 hinge**
 
@@ -46,16 +48,25 @@ would have to impose it explicitly on top of the model.
 
 **Human walk — CMU MoCap subject 35**
 
-| Rollout | 1 step | 2 steps | 3 steps |
-|---|---|---|---|
-| MSE | 0.3570 | 1.3149 | 3.0069 |
+| Rollout | 1 step | 2 steps |
+|---|---|---|
+| MSE | 0.3570 | 1.3149 |
 
 ![Human walk rollout](docs/assets/human_walk_rollout.png)
 
+The figure shows the best-predicted test sequences; `--mode visual` ranks every sequence by
+its 2-step rollout error and plots the lowest.
+
 **Protein — AdK equilibrium trajectory**
 
-The checkpoint for this case is being retrained and is not in this release yet. The code path
-is complete and trains from scratch with the command in [Usage](#usage).
+| Rollout | 1 step | 2 steps | 3 steps | 4 steps |
+|---|---|---|---|---|
+| MSE | 2.5937 | 3.2973 | 3.2963 | 3.2303 |
+
+Unlike the other two cases, each horizon here is evaluated on a slightly different number of
+sequences, because a longer rollout needs more frames after the start and so drops a few near
+the end of the trajectory (831, 828, 825, 822). The horizons are therefore not measured on
+identical sets, which is part of why the error flattens rather than climbing.
 
 ---
 
@@ -145,11 +156,14 @@ python main_human_walk.py --mode test
 python main_human_walk.py --mode visual
 ```
 
-**Protein.** Run the preprocessing above first; the loader fails without it.
+**Protein.** Run the preprocessing above first; the loader fails without it. `visual` writes
+PDB files of the predicted and true backbones for inspection in a molecular viewer, rather
+than images.
 
 ```bash
 python main_protein.py --mode train
 python main_protein.py --mode test
+python main_protein.py --mode visual
 ```
 
 Training writes the best checkpoint to the case's `saved_models/` and clears earlier ones.

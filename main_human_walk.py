@@ -111,7 +111,7 @@ def main():
         model.load_state_dict(torch.load(best_path, map_location=device))
         print('\n EVALUATING...')
 
-        for nstep in [1,2,3]:
+        for nstep in [1,2]:
             
             dataset_eval = HumanDatasetSeq(
                 partition='test', 
@@ -136,14 +136,14 @@ def main():
             partition='test', 
             max_samples=MODEL_SETTINGS["max_testing_samples"], 
             data_dir=MODEL_SETTINGS["data_dir"], delta_frame=MODEL_SETTINGS["delta_frame"],
-            nsteps=3)
+            nsteps=2)
         loader = create_dataloaders_from_raw(dataset_eval,200,shuffle=False)
         visualize_multi_step(
                             loader,
                             MODEL_SETTINGS["results_dir"],
                             trainer.model,
                             device,
-                            steps=[1,2,3],
+                            steps=[1,2],
                             num_graphs=5
                             )
         create_gif(MODEL_SETTINGS["results_dir"])        

@@ -7,11 +7,15 @@ from torch_geometric.nn import global_mean_pool
 
 class RefFrameCalc(nn.Module):
     """
-    Computes antisymmetric, local orthonormal basis vectors (a, b, c) for each edge.
+    Builds a local orthonormal basis (a, b, c) per edge from relative position and
+    velocity.
 
-    Ensures SE(3) invariance by constructing a coordinate system based on relative
-    positions and velocities. The basis (a, b, c) allows the network to learn
-    orientation-independent physical laws.
+    The basis rotates with the system, so projecting vectors onto it yields scalars
+    that do not. That is what makes the network's inputs SE(3) invariant and its
+    outputs equivariant.
+
+    All three vectors flip sign when the edge is traversed the other way, which is what
+    makes the decoded impulses antisymmetric and so conserves linear momentum.
     """
 
     def __init__(self):
@@ -94,9 +98,10 @@ class NodeEncoder(nn.Module):
 
 class InteractionEncoder(nn.Module):
     """
-    Projects global state vectors onto the local reference frame for SE(3)-invariant message passing.
+    Projects each edge's velocities onto its local frame and encodes the result.
 
-    Encodes the projected relative velocities and edge attributes into a latent interaction vector.
+    Because the frame rotates with the system, the projections are plain scalars, so the
+    MLPs downstream never see a global direction.
     """
 
     def __init__(self, edge_in_f, latent_size, mlp_layers):
@@ -138,43 +143,33 @@ class InteractionEncoder(nn.Module):
 
         senders, receivers = edge_index
 
-        # --- Vectorized Projection ---
-        # Stack basis vectors into a Rotation Matrix R = [a, b, c] of shape (E, 3, 3)
-        # We want to project vectors v onto this basis: v_local = [v.a, v.b, v.c]
-
-        # Basis shape: (E, 3, 3). rows are a, b, c.
+        # Rows are a, b, c, so multiplying gives [v.a, v.b, v.c].
         basis = torch.stack([vector_a, vector_b, vector_c], dim=1)  # (E, 3, 3)
 
         def project(v):
-            # v: (E, 3) -> (E, 3, 1)
-            # basis: (E, 3, 3)
-            # result: (E, 3, 1) -> (E, 3)
-            # This computes [row1.v, row2.v, row3.v] -> [v.a, v.b, v.c]
             return torch.bmm(basis, v.unsqueeze(-1)).squeeze(-1)
 
-        # Project senders
         s_vt_proj = project(senders_v_t_)
         s_vtm1_proj = project(senders_v_tm1_)
         s_wt_proj = project(senders_w_t_)
 
-        # Project receivers (on the antisymmetric reference frame)
+        # Negated so that each end of the edge sees the same features as it would if it
+        # were the sender, since the basis itself flips between the two directions.
         r_vt_proj = -project(receivers_v_t_)
         r_vtm1_proj = -project(receivers_v_tm1_)
         r_wt_proj = -project(receivers_w_t_)
 
-        # Concatenate features (9 features per node per edge)
         senders_features = torch.cat([s_vt_proj, s_vtm1_proj, s_wt_proj], dim=1)
         receivers_features = torch.cat([r_vt_proj, r_vtm1_proj, r_wt_proj], dim=1)
 
-        # Edge encodings
         edge_dx_norm = edge_dx_.norm(dim=1, keepdim=True)
         edge_latent = self.edge_encoder(torch.cat((edge_dx_norm, edge_attr), dim=1))
 
-        # Encode features
         senders_latent = self.edge_feat_encoder(senders_features)
         receivers_latent = self.edge_feat_encoder(receivers_features)
 
-        # Message Passing
+        # Summed rather than concatenated, so the message is the same whichever way the
+        # edge is traversed. This is what keeps the decoded coefficients direction free.
         node_sum = node_latent[senders] + node_latent[receivers]
         msg_input = torch.cat(
             (senders_latent + receivers_latent, node_sum, edge_latent), dim=1
@@ -185,16 +180,19 @@ class InteractionEncoder(nn.Module):
 
 class InteractionDecoder(torch.nn.Module):
     """
-    Decodes interaction latent vectors into physical impulses (forces and torques).
+    Turns each edge's latent into a linear impulse (force * dt) and a spin impulse
+    (torque * dt).
 
-    Enforces conservation of linear and angular momentum by decomposing impulses into
-    central and spin components, ensuring action-reaction symmetry.
+    The impulses are rebuilt as coefficients times the edge basis. Since the basis flips
+    under edge reversal and the coefficients do not, dp_ji = -dp_ij holds exactly, so
+    linear momentum is conserved regardless of the weights.
+
+    For angular momentum the network emits the total angular impulse and a weighting that
+    places a reference point between the two nodes. Subtracting the orbital part carried
+    by dp leaves the spin.
     """
 
     def __init__(self, latent_size=128, mlp_layers=2):
-        """
-        Decode velocity and angular velocity impulses (equivalent to force*dt and torque*dt)
-        """
         super(InteractionDecoder, self).__init__()
         self.i1_decoder = build_mlp_d(
             latent_size, latent_size, 3, num_layers=mlp_layers, lay_norm=False
@@ -220,33 +218,30 @@ class InteractionDecoder(torch.nn.Module):
     ):
         senders, receivers = edge_index
 
-        # Decode coefficients
         coeff_dp = self.i1_decoder(interaction_latent)
         coeff_dl = self.i2_decoder(interaction_latent)
 
-        # Reconstruct change in momentum in global frame
-        # Linear combination: c0*a + c1*b + c2*c
+        # Back to the global frame as c0*a + c1*b + c2*c.
         dpij = (
             coeff_dp[:, 0:1] * vector_a
             + coeff_dp[:, 1:2] * vector_b
             + coeff_dp[:, 2:3] * vector_c
         )
-        # Reconstruct chainge in totoal angular momentum in global frame (it has both sping and orbital components)
+        # Total angular impulse: orbital and spin parts together.
         dlij = (
             coeff_dl[:, 0:1] * vector_a
             + coeff_dl[:, 1:2] * vector_b
             + coeff_dl[:, 2:3] * vector_c
         )
 
-        # Node weights for reference point for cons. of ang. momentum
+        # Reference point the angular impulse is taken about, placed between the two
+        # nodes by learned weights.
         w_s = self.node_weight_decoder(node_latent[senders])
         w_r = self.node_weight_decoder(node_latent[receivers])
-
-        # Weighted center r0ij
         denom = w_s + w_r + self.eps
         r0ij = (w_s * senders_pos + w_r * receivers_pos) / denom
 
-        # Compute spin component
+        # Strip the orbital contribution of dp to leave the spin.
         dsij = dlij - torch.cross(receivers_pos - r0ij, dpij, dim=1)
 
         return dpij, dsij
@@ -254,9 +249,10 @@ class InteractionDecoder(torch.nn.Module):
 
 class Node_Internal_Dv_Decoder(torch.nn.Module):
     """
-    Aggregates edge impulses and computes node state updates (dv, dw) using Newton's laws.
+    Sums the impulses arriving at each node and turns them into dv and dw.
 
-    Infers physical properties (inverse mass, inverse inertia) directly from node embeddings.
+    Mass and inertia are never supplied. Their inverses are decoded from the node latent
+    through a softplus, which keeps them positive.
     """
 
     def __init__(self, latent_size=128, mlp_layers=2):
@@ -272,20 +268,18 @@ class Node_Internal_Dv_Decoder(torch.nn.Module):
         senders, receivers = edge_index
         num_nodes = node_latent.shape[0]
 
-        # Decode physical properties
         m_inv = F.softplus(self.m_inv_decoder(node_latent))
         i_inv = F.softplus(self.i_inv_decoder(node_latent))
 
-        # Aggregate Forces and Torques
+        # Every edge appears in both directions, so scattering onto receivers alone
+        # already collects both sides of each interaction.
         out_fij = node_latent.new_zeros((num_nodes, 3))
         out_tij = node_latent.new_zeros((num_nodes, 3))
 
         out_fij.index_add_(0, receivers, fij)
         out_tij.index_add_(0, receivers, tij)
 
-        # Compute internal impulse
         node_dv_int = m_inv * out_fij
-        # compute angular impulse
         node_dw_int = i_inv * out_tij
 
         return node_dv_int, node_dw_int
@@ -293,9 +287,10 @@ class Node_Internal_Dv_Decoder(torch.nn.Module):
 
 class Scaler(torch.nn.Module):
     """
-    Standardizes input features based on training statistics to ensure stable gradients.
+    Normalises velocities and edge vectors to O(1) using training-set statistics.
 
-    Scales magnitudes of velocities and distances while preserving their direction.
+    Magnitudes are scaled, directions are left alone, so the reference frame built from
+    these vectors is unaffected.
     """
 
     def __init__(self):
@@ -315,7 +310,7 @@ class Scaler(torch.nn.Module):
     ):
         stat_edge_dx, stat_node_v_t, _, _ = train_stats
 
-        # Use detach on stats to ensure no gradients flow back to stats (redundant but safe)
+        # Stats are constants; detach so no gradient reaches them.
         v_scale = stat_node_v_t[1].detach() + self.eps
 
         senders_v_t_ = senders_v_t / v_scale
@@ -324,13 +319,10 @@ class Scaler(torch.nn.Module):
         receivers_v_tm1_ = receivers_v_tm1 / v_scale
 
         norm_edge_dx = edge_dx.norm(dim=1, keepdim=True)
-        # Avoid division by zero
         safe_norm = norm_edge_dx + self.eps
 
-        # Scale angular velocity.
-        # Logic: v_tangential = w * r. By computing (w * r) / v_scale, we normalize
-        # the tangential velocity at the edge distance, making rotation features
-        # magnitude-compatible with linear velocity features.
+        # Divided by the same velocity scale so that angular and linear features end up
+        # comparable in magnitude.
         senders_w_t_ = senders_w_t * (1 / v_scale)
         receivers_w_t_ = receivers_w_t * (1 / v_scale)
 
@@ -354,9 +346,10 @@ class Scaler(torch.nn.Module):
 
 class Interaction_Block(torch.nn.Module):
     """
-    Wrapper module combining interaction encoding, force/torque decoding, and node updates.
+    One round of message passing: encode the edges, decode impulses, scatter to nodes.
 
-    Supports residual connections for recurrent multi-step message passing.
+    When a previous latent is passed in, it is added and normalised, which lets the
+    sub-steps share information.
     """
 
     def __init__(self, edge_in_f, latent_size, mlp_layers):
@@ -431,12 +424,14 @@ class Interaction_Block(torch.nn.Module):
 
 class DynamicsSolver(torch.nn.Module):
     """
-    Main physics simulation loop for Rigid Body Dynamics.
+    The learned integrator: message passing and state update, run num_msgs times over a
+    sub-step of the full time step.
 
-    This module iteratively evolves the system state using a Graph Neural Network (GNN)
-    coupled with a symplectic integrator. It guarantees the conservation of linear
-    and angular momentum for internal interactions, while allowing for a learnable
-    isotropic external influence (drag).
+    Internal interactions conserve linear momentum exactly, so an isolated system cannot
+    gain or lose it. The one term that can is the external head, which scales the node's
+    own velocity and so acts along the direction of travel, like drag.
+
+    Returns the summed dv and dx over all sub-steps, not the final state.
     """
 
     def __init__(
@@ -485,7 +480,6 @@ class DynamicsSolver(torch.nn.Module):
         self.train_stats = train_stats
 
     def forward(self, graph):
-        # 1. Unpack Graph Data
         pos = graph.pos.float()
         vel = graph.vel.float()
         prev_vel = graph.prev_vel.float()
@@ -494,32 +488,26 @@ class DynamicsSolver(torch.nn.Module):
         edge_index = graph.edge_index.long()
         senders, receivers = edge_index
 
-        # 2. Initialize State Variables
         node_v_t = vel
         node_v_tm1 = prev_vel
-        # If angular velocity isn't present, assume zero (point masses initially)
+        # Datasets without spin (point masses) simply do not carry this field.
         node_w_t = getattr(graph, "node_w_t", torch.zeros_like(vel))
 
-        # 3. Initialize Accumulators
-        # These will sum up the total changes over all message-passing steps
+        # Totals over all sub-steps; these are what the model returns.
         sum_node_dv = torch.zeros_like(vel)
         sum_node_dx = torch.zeros_like(vel)
 
-        # 4. Pre-compute Node Embeddings
-        # Encodes static properties (mass, radius) once, as they don't change during steps.
+        # Node properties are static, so encode them once outside the loop.
         node_latent = self.node_encoder(node_type)
 
-        # 5. Initialize Loop Variables
         current_pos = pos
         current_edge_dx = current_pos[receivers] - current_pos[senders]
 
-        residue = None  # For RNN-style memory between message steps
+        residue = None  # carries the edge latent between sub-steps
         node_dv = torch.zeros_like(vel)
         node_dw = torch.zeros_like(vel)
 
-        # --- Message Passing & Integration Loop ---
         for i in range(self.num_messages):
-            # A. Gather Current State for Edges
             s_vt = node_v_t[senders]
             r_vt = node_v_t[receivers]
             s_vtm1 = node_v_tm1[senders]
@@ -527,8 +515,6 @@ class DynamicsSolver(torch.nn.Module):
             s_wt = node_w_t[senders]
             r_wt = node_w_t[receivers]
 
-            # B. Input Normalization
-            # Scales features to O(1) range for stability, using training stats.
             s_vt_, s_vtm1_, r_vt_, r_vtm1_, s_wt_, r_wt_, edge_dx_ = self.scaler(
                 s_vt,
                 s_vtm1,
@@ -540,8 +526,7 @@ class DynamicsSolver(torch.nn.Module):
                 self.train_stats,
             )
 
-            # C. Frame Construction
-            # Builds local basis (a, b, c) to ensure SE(3) invariance (rotation independence).
+            # Note the angular velocities go in unscaled, unlike the linear ones.
             vec_a, vec_b, vec_c = self.refframecalc(
                 edge_index,
                 current_pos[senders],
@@ -554,8 +539,8 @@ class DynamicsSolver(torch.nn.Module):
                 r_wt,
             )
 
-            # D. Interaction Block (Internal Forces)
-            # Calculates pairwise forces/torques conserving momentum.
+            # First sub-step uses its own block; later ones share a second block and
+            # carry the previous latent forward as a residual.
             layer = (
                 self.interaction_init_layer if i == 0 else self.interaction_proc_layer
             )
@@ -581,40 +566,34 @@ class DynamicsSolver(torch.nn.Module):
                 latent_history=history_flag,
             )
 
-            # E. External Influence
-            # The decoder emits an isotropic coefficient acting on the node's own
-            # velocity, so the external update rotates with the system.
+            # The only term that can change the system's total momentum. A scalar times
+            # the node's own velocity keeps it equivariant and confines it to the
+            # direction of travel.
             ext_input = torch.hstack((node_latent, node_v_t.norm(dim=1, keepdim=True)))
 
             node_dv_ext = self.ext_interaction_layers[i](ext_input) * node_v_t
 
-            # F. Symplectic Euler Integration
-            # 1. Accumulate total velocity change (Internal + External)
+            # The decoded quantities are already impulses, so they add straight to the
+            # velocity without a further dt.
             sum_node_dv += node_dv + node_dv_ext
 
-            # 2. Update Velocity (v_new = v_old + a * dt)
-            # Note: node_dv is effectively (Force / Mass) * dt
             node_vf = node_v_t.clone()
             node_vf += node_dv + node_dv_ext
 
-            # 3. Update Angular Velocity
             node_wf = node_w_t.clone()
             node_wf += node_dw
 
-            # 4. Calculate Displacement (x_new = x_old + v_new * dt)
-            # Semi-implicit Euler uses the *new* velocity for position update.
-            # Using (v_old + v_new) * 0.5 is akin to Trapezoidal rule / Verlet integration.
+            # Position advances on the mean of the old and new velocity (trapezoidal),
+            # which is where the sub-step dt enters.
             step_disp = (node_v_t + node_vf) * (0.5 * self.sub_tstep)
             sum_node_dx += step_disp
 
-            # 5. Update State for Next Iteration
             current_pos = current_pos + step_disp
 
-            node_v_tm1 = node_v_t  # Update the prev velocity
+            node_v_tm1 = node_v_t
             node_v_t = node_vf
             node_w_t = node_wf
 
-            # Update edge vectors based on new positions
             current_edge_dx = current_pos[receivers] - current_pos[senders]
 
         return sum_node_dv, sum_node_dx
