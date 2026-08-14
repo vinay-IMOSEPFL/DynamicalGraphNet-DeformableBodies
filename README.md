@@ -31,7 +31,18 @@ so the last quoted digit moves between runs.
 ![N-body rollout](docs/assets/nbody_rollout.png)
 
 Red is ground truth, blue is prediction. Red lines are rigid sticks, orange are hinges. This
-is a typical case, picked at the median of 60 test sequences rather than the best.
+is a good case, the 10th percentile of 200 test sequences by 3-step error, not the best one.
+
+Accuracy varies a lot between sequences, so one picture does not represent the case on its
+own. Across those 200, 3-step MSE runs:
+
+| | p10 | median | p90 |
+|---|---|---|---|
+| 3-step MSE (×1e-2) | 2.98 | 12.65 | 55.06 |
+
+The median is roughly four times the figure above and the tail is an order of magnitude
+worse, so expect `--mode visual`, which samples at random, to produce something looser than
+this most of the time.
 
 The model is told which edges are sticks or hinges through an edge feature, but rigidity is
 never enforced on the output — there is no constraint projection or correction step. It is
