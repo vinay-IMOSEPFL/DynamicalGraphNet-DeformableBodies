@@ -103,6 +103,18 @@ with 50 workers and so cannot be reproduced bit-for-bit. Regenerating gives a st
 equivalent system of the same composition, not the same arrays. Use one worker if you need
 determinism — it is much slower.
 
+This costs less than it sounds. We generated a fresh 500-simulation test set from a different
+seed on a single worker and scored the shipped checkpoint on it:
+
+| Rollout | shipped `data_321` | independently generated |
+|---|---|---|
+| 1 step | 1.4796e-02 | 1.4369e-02 |
+| 2 steps | 7.9042e-02 | 7.5700e-02 |
+| 3 steps | 2.2723e-01 | 2.2234e-01 |
+| 4 steps | 4.8982e-01 | 4.8639e-01 |
+
+Within 1–4%, and slightly lower on the new data. The arrays do not reproduce; the numbers do.
+
 **Human walk** — CMU Motion Capture subject 35, using the preprocessed release from
 [GMN](https://github.com/hanjq17/GMN) so that both methods train on identical data:
 
