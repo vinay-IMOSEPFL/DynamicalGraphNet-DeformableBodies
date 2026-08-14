@@ -191,7 +191,7 @@ Visualisations land in the case's `results/`.
   Node_Internal_Dv_Decoder ──► scatter to nodes, scale by learned m⁻¹, I⁻¹
             │
             ▼
-     semi-implicit Euler ──► (x, v, ω) at t+1
+   trapezoidal position step ──► (x, v, ω) at t+1
 ```
 
 ### The edge frame
@@ -343,6 +343,11 @@ use is permitted, including at educational and public research institutions rega
 they are funded, and you may redistribute and build on the code so long as the notice travels
 with it. For commercial use, contact [EPFL's Technology Transfer Office](https://tto.epfl.ch/)
 or the IMOS laboratory.
+
+EPFL's signed bilateral agreement for this software is included as
+[docs/EPFL_NonCommercial_License_Agreement.pdf](docs/EPFL_NonCommercial_License_Agreement.pdf),
+for reference and for organisations that require a countersigned instrument. It adds no
+restrictions to use under the license above.
 
 The n-body simulator and its data generator come from GMN and stay under their original MIT
 license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

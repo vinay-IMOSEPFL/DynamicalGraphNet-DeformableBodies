@@ -7,8 +7,17 @@ Required Notice: Copyright EPFL, Laboratory of Intelligent Maintenance and Opera
 Systems (IMOS), 2025. Authors: Vinay Sharma and Olga Fink.
 https://www.epfl.ch/labs/imos/
 
-Noncommercial use is granted under the terms below. **For a commercial license, contact
-EPFL's Technology Transfer Office (https://tto.epfl.ch/) or the IMOS laboratory.**
+**The terms below govern this repository.** Noncommercial use is granted by them and needs
+no signature or registration.
+
+`docs/EPFL_NonCommercial_License_Agreement.pdf` is the signed bilateral agreement EPFL uses
+for this software. It is included for reference and for organisations whose own policies
+require a countersigned instrument on file. It does not add restrictions to anyone using
+this repository under the terms below.
+
+**For a commercial license, contact EPFL's Technology Transfer Office
+(https://tto.epfl.ch/) or the IMOS laboratory.** The agreement above does not grant
+commercial rights.
 
 Parts of this repository are covered by other licenses. In particular the n-body simulator
 and its data generator are MIT licensed and remain so; see THIRD_PARTY_NOTICES.md.
