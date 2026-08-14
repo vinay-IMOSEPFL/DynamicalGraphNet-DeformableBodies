@@ -1,3 +1,5 @@
+# Taken from Graph Mechanics Networks (https://github.com/hanjq17/GMN),
+# MIT licensed, Copyright (c) 2022 AlexHan. See THIRD_PARTY_NOTICES.md.
 import numpy as np
 
 eps = 1e-6
