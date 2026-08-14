@@ -106,8 +106,9 @@ selection and shifts the numbers.
 
 **Protein** — rebuilds exactly, so nothing needs to ship. The script pulls the AdK
 equilibrium trajectory through `MDAnalysisData` and writes the per-frame tensors the loader
-reads. There is no randomness in it. Run it from inside the case folder, as its paths are
-relative:
+reads. There is no randomness in it, and we checked: rebuilding from scratch reproduces every
+frame's positions and velocities bit-for-bit, with `edge_attr` differing by 2e-16, one ULP.
+Run it from inside the case folder, as its paths are relative:
 
 ```bash
 cd case_02_protein
@@ -115,6 +116,10 @@ python preprocess_data.py
 ```
 
 That produces `mdanalysis/dataset/adk_backbone_processed/`, about 99 MB across ~4200 files.
+The script writes into that directory without clearing it first, so if you re-run it after a
+change that alters the frame count, frames from the previous run are left behind. The loader
+reads the count from `adk.pkl` and ignores the extras, but delete the directory first if you
+want it clean.
 
 ---
 
