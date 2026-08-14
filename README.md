@@ -336,6 +336,19 @@ width went from 3 to 1. Every model in this release was retrained afterwards.
 
 ---
 
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE.md). Research, teaching and any other noncommercial
+use is permitted, including at educational and public research institutions regardless of how
+they are funded, and you may redistribute and build on the code so long as the notice travels
+with it. For commercial use, contact [EPFL's Technology Transfer Office](https://tto.epfl.ch/)
+or the IMOS laboratory.
+
+The n-body simulator and its data generator come from GMN and stay under their original MIT
+license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+---
+
 ## Citation
 
 ```bibtex
