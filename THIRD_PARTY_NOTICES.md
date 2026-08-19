@@ -49,8 +49,3 @@ SOFTWARE.
 The human walk trajectories are subject 35 of the CMU Graphics Lab Motion Capture Database
 (<http://mocap.cs.cmu.edu>), used here via GMN's preprocessed release. The database is free
 to use; see the CMU site for its terms.
-
-## MDAnalysisData
-
-The protein case downloads the AdK equilibrium trajectory through `MDAnalysisData`. Nothing
-from it is redistributed here.
