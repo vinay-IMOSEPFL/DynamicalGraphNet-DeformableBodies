@@ -1,3 +1,8 @@
+# (c) All rights reserved. ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland,
+# Laboratory of Intelligent Maintenance and Operations Systems (IMOS), 2025.
+# Authors: Vinay Sharma and Olga Fink
+# Released under the Non-Commercial License Agreement in LICENSE.txt.
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting

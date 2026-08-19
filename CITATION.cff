@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the article below and include the acknowledgement text given in the notes."
+type: software
+title: "DynamicalGNN"
+abstract: "A physics-informed graph neural network that conserves linear and angular momentum by construction."
+authors:
+  - family-names: Sharma
+    given-names: Vinay
+    affiliation: "EPFL, Laboratory of Intelligent Maintenance and Operations Systems (IMOS)"
+  - family-names: Fink
+    given-names: Olga
+    affiliation: "EPFL, Laboratory of Intelligent Maintenance and Operations Systems (IMOS)"
+license-url: "LICENSE.txt"
+notes: >
+  Required acknowledgement in publications resulting from use of the Program:
+  "This work uses the DynamicalGNN software developed at EPFL IMOS Lab
+  (Intelligent Maintenance and Operations Systems Laboratory)."
+preferred-citation:
+  type: article
+  title: "A physics-informed graph neural network conserving linear and angular momentum for dynamical systems"
+  authors:
+    - family-names: Sharma
+      given-names: Vinay
+    - family-names: Fink
+      given-names: Olga
+  journal: "Nature Communications"
+  year: 2026
+  doi: "10.1038/s41467-025-67802-5"

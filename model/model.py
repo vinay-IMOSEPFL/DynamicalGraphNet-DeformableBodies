@@ -1,3 +1,8 @@
+# (c) All rights reserved. ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland,
+# Laboratory of Intelligent Maintenance and Operations Systems (IMOS), 2025.
+# Authors: Vinay Sharma and Olga Fink
+# Released under the Non-Commercial License Agreement in LICENSE.txt.
+
 import torch
 import torch.nn as nn
 from utils.utils import build_mlp_d
@@ -466,6 +471,10 @@ class DynamicsSolver(torch.nn.Module):
         # n-body case has no external field, and this is the one path that could
         # change its total momentum, so leaving it out keeps conservation exact.
         if use_ext_force:
+            # we aim to predict a scalar multiplier for a known equivariant vector 
+            # (e.g. velocity-dir (vt/|vt|), 
+            # acceleration-dir (vt-vtm1)/|vt-vtm1|, etc.) or maybe even the axis (0,1,0)
+            # to produce an external force. 
             self.ext_interaction_layers = nn.ModuleList(
                 build_mlp_d(
                     latent_size + 1,
