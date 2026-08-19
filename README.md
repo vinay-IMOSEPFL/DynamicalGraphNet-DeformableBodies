@@ -355,8 +355,7 @@ does not permit re-using parts of the Program in other programs, and requires th
 copyright headers in the source files are left intact. Redistribution is permitted only for
 academic, non-commercial purposes and only with a copy of the licence included.
 
-For commercial licensing, contact [EPFL's Technology Transfer Office](https://tto.epfl.ch/) or
-the IMOS laboratory.
+For commercial licensing, contact [EPFL's Technology Transfer Office](https://tto.epfl.ch/).
 
 Cite as set out in [CITATION.cff](CITATION.cff), which also carries the acknowledgement text
 the licence asks for.

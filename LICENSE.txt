@@ -24,6 +24,7 @@ The Licensee will access to the source code or a compiled version of the Program
 
 10.	This License is perpetual but can be terminated by the Licensor in case where Licensee (i) became insolvent or otherwise entered into any liquidation process, (ii) exported the Program to any jurisdiction where Licensor may not enforce his rights under this Agreement (iii) Licensee breach any of this License's terms and conditions and such breach is not cured, immediately upon notification (iv) Licensee otherwise entered into any arrangement which caused Licensor to be unable to enforce his rights under this License. Upon termination, Licensee must destroy all copies of the Program.
 
-For commercial licensing, contact EPFL's Technology Transfer Office (https://tto.epfl.ch/) or the Laboratory of Intelligent Maintenance and Operations Systems (IMOS).
+For commercial licensing, contact EPFL's Technology Transfer Office (https://tto.epfl.ch/).
 
-(c) All rights reserved. ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland, Laboratory of Intelligent Maintenance and Operations Systems (IMOS), 2025. Authors: Vinay Sharma and Olga Fink
+(c) All rights reserved. ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE (EPFL), Switzerland, 2025.
+Authors: Vinay Sharma and Olga Fink, Laboratory of Intelligent Maintenance and Operations Systems (IMOS).
